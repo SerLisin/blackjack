@@ -1,12 +1,14 @@
 #include <iostream>
 #include <vector>
+#include <algorithm>
+#include <string>
+#include <ctime>
 
 using namespace std;
 
 
-//enum suit { CLUBS, DIAMONDS, SPADES, HEARTS };
-//enum rank {ACE = 1, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING};
 
+//////////////////////////// class Card //////////////////////////////////
 
 class Card{
 
@@ -57,6 +59,8 @@ int Card::GetValue() const {
 	   return value;
 }
 
+//////////////////////////// class Hand //////////////////////////////////
+
 class Hand{
 protected:
 	vector<Card*> m_Cards;
@@ -101,10 +105,10 @@ public:
 	virtual ~Hand(){Clear();}
 };
 
+//////////////////////////// class GenericPlayer //////////////////////////////////
 
 class GenericPlayer : public Hand
 {
-friend ostream& operator<<(ostream& os, const GenericPlayer& aGenericPlayer); // Task5
 protected:
 	string m_Name;
 public:
@@ -113,9 +117,10 @@ public:
 	bool IsBoosted() const {return (GetTotal() > 21);}
 	void Bust() const {cout << m_Name << " busts." << endl;}
 	virtual ~GenericPlayer(){};
+	friend ostream& operator<<(ostream& os, const GenericPlayer& aGenericPlayer); 
 };
 
-// Task5
+
 ostream& operator<<(ostream& os, const GenericPlayer& aGenericPlayer)
 {
     os << aGenericPlayer.m_Name << ":\t";
@@ -138,12 +143,13 @@ ostream& operator<<(ostream& os, const GenericPlayer& aGenericPlayer)
     return os;
 }
 
-// Task3
+//////////////////////////// class Player //////////////////////////////////
+
 class Player : public GenericPlayer
 {
 public:
-	Player(const string& name = "");
-	virtual ~Player();
+	Player(const string& name = ""):GenericPlayer(name){}
+	virtual ~Player(){}
 	virtual bool IsHitting() const
 	{
 		cout << m_Name << ", do you want a hit? (Y/N): ";
@@ -155,12 +161,15 @@ public:
 	void Lose() const {cout << m_Name << " loses.\n";};
 	void Push() const {cout << m_Name << " pushes.\n";};
 };
-// Task4
+
+//////////////////////////// class House //////////////////////////////////
+
 class House : public GenericPlayer
 {
-	House(const string& name = "House");
-    virtual ~House();
-    virtual bool IsHitting() const {return (GetTotal() <= 16);};
+public:
+	House(const string& name = "House"):GenericPlayer(name){}
+    virtual ~House(){}
+    virtual bool IsHitting() const {return (GetTotal() <= 16);}
     void FlipFirstCard()
 	{
 		if (!(m_Cards.empty()))
@@ -174,6 +183,183 @@ class House : public GenericPlayer
 	};
 };
 
+//////////////////////////// class Deck //////////////////////////////////
+
+// Task3
+class Deck : public Hand
+{
+public:
+    Deck();
+    virtual ~Deck();
+    void Populate();
+    void Shuffle();
+    void Deal(Hand& aHand);
+    void AdditionalCards(GenericPlayer& aGenericPlayer);
+};
+
+Deck::Deck()
+{
+    m_Cards.reserve(52);
+    Populate();
+}
+
+Deck::~Deck()
+{}
+
+void Deck::Populate()
+{
+    Clear();
+	for (int s = Card::CLUBS; s <= Card::HEARTS; ++s)
+    {
+        for (int r = Card::ACE; r <= Card::KING; ++r)
+        {
+	        Add(new Card(static_cast<Card::rank>(r),
+                         static_cast<Card::suit>(s)));
+        }
+    }
+}
+
+void Deck::Shuffle()
+{
+    random_shuffle(m_Cards.begin(), m_Cards.end());
+}
+
+void Deck::Deal(Hand& aHand) // polymorphism
+{
+    if (!m_Cards.empty())
+    {
+        aHand.Add(m_Cards.back());
+        m_Cards.pop_back();
+    }
+    else
+    {
+        cout << "Out of cards. Unable to deal." << endl;
+		exit(0);
+    }
+}
+
+void Deck::AdditionalCards(GenericPlayer& aGenericPlayer) // polymorphism
+{
+    cout << endl;
+    while (!(aGenericPlayer.IsBoosted()) && aGenericPlayer.IsHitting())
+    {
+        Deal(aGenericPlayer);             // polymorphism
+		
+        cout << aGenericPlayer << endl;
+
+        
+        if (aGenericPlayer.IsBoosted())
+        {
+            aGenericPlayer.Bust();
+        }
+    }
+}
+
+//////////////////////////// class Game //////////////////////////////////
+
+// Task4
+class Game
+{
+public:
+    Game(const vector<string>& names);
+    ~Game();
+    void Play();
+ private:
+    Deck m_Deck;
+    House m_House;
+    vector<Player> m_Players;
+};
+
+Game::Game(const vector<string>& names)
+{
+    vector<string>::const_iterator pName;
+    for (pName = names.begin(); pName != names.end(); ++pName)
+    {
+        m_Players.push_back(Player(*pName));
+    }
+    
+    srand(static_cast<unsigned int>(time(0)));
+    //m_Deck.Populate(); 
+    //m_Deck.Shuffle();
+}
+
+Game::~Game()
+{}
+void Game::Play()
+{
+	m_Deck.Populate(); // removed from Game::Game
+    m_Deck.Shuffle();  // removed from Game::Game
+    vector<Player>::iterator pPlayer;
+    for (int i = 0; i < 2; ++i)
+    {
+        for (pPlayer = m_Players.begin(); pPlayer != m_Players.end(); ++pPlayer)
+        {
+            m_Deck.Deal(*pPlayer); // polymorphism
+        }
+        m_Deck.Deal(m_House);  // polymorphism
+    }
+    
+    m_House.FlipFirstCard();
+    
+    for (pPlayer = m_Players.begin(); pPlayer != m_Players.end(); ++pPlayer)
+    {
+        cout << *pPlayer << endl;
+    }
+    cout << m_House << endl;
+    
+    for (pPlayer = m_Players.begin(); pPlayer != m_Players.end(); ++pPlayer)
+    {
+        m_Deck.AdditionalCards(*pPlayer);  // polymorphism
+    }
+    
+    m_House.FlipFirstCard();
+    cout << endl << m_House;
+    
+    m_Deck.AdditionalCards(m_House);  // polymorphism 
+    
+    if (m_House.IsBoosted())
+    {
+        for (pPlayer = m_Players.begin(); pPlayer != m_Players.end(); ++pPlayer)
+        {
+            if (!(pPlayer->IsBoosted()))
+            {
+                pPlayer->Win();
+            }
+        }
+    }
+    else
+    {
+        for (pPlayer = m_Players.begin(); pPlayer != m_Players.end(); ++pPlayer)
+        {
+            if (!(pPlayer->IsBoosted()))
+            {
+                if (pPlayer->GetTotal() > m_House.GetTotal())
+                {
+                    pPlayer->Win();
+                }
+                else if (pPlayer->GetTotal() < m_House.GetTotal())
+                {
+                    pPlayer->Lose();
+                }
+                else
+                {
+                    pPlayer->Push();
+                }
+            }
+        }
+        
+    }
+    
+    for (pPlayer = m_Players.begin(); pPlayer != m_Players.end(); ++pPlayer)
+    {
+        pPlayer->Clear();
+    }
+    m_House.Clear();
+}
+
+//////////////////////////// main //////////////////////////////////
+
+// Task5
 int main(int argc,char** args){
 
     cout << "\t\tWelcome to Blackjack!\n\n";
@@ -195,8 +381,7 @@ int main(int argc,char** args){
     }
     cout << endl;
     
-    // игровой цикл
-/*    Game aGame(names);
+    Game aGame(names);
     char again = 'y';
     while (again != 'n' && again != 'N')
     {
@@ -204,7 +389,7 @@ int main(int argc,char** args){
         cout << "\nDo you want to play again? (Y/N): ";
         cin >> again;
     }
-  */  
+
 
 
     return 0;
