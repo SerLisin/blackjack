@@ -1,32 +1,49 @@
 #include <iostream>
 #include <vector>
 
-using std::endl;
-using std::cout;
-using std::cin;
-using std::string;
-using std::vector;
+using namespace std;
 
 
-enum suit { CLUBS, DIAMONDS, SPADES, HEARTS };
-enum rank {ACE = 1, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING};
+//enum suit { CLUBS, DIAMONDS, SPADES, HEARTS };
+//enum rank {ACE = 1, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING};
 
 
 class Card{
 
 public:
-//	enum suit { CLUBS, DIAMONDS, SPADES, HEARTS };
-//	enum rank {ACE = 1, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING};
+	enum suit { CLUBS, DIAMONDS, SPADES, HEARTS };
+	enum rank {ACE = 1, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING};
     Card(rank r = ACE, suit s = SPADES, bool ifu = true);
     int GetValue() const;
     void Flip();
+	friend ostream& operator<< (ostream& os,const Card& aCard);
 private:
     suit m_Suit;
     rank m_Rank;
     bool m_IsFaceUp;
 };
+
 Card::Card(rank r, suit s, bool p): m_Suit(s),m_Rank(r), m_IsFaceUp(p){}
+
 void Card::Flip(){m_IsFaceUp = !(m_IsFaceUp);}
+
+ostream& operator<< (ostream& os,const Card& aCard)
+{
+	const string RANKS[] = { "0", "A", "2", "3", "4", "5", "6", "7", "8", "9","10", "J", "Q", "K" };
+    const string SUITS[] = { "c", "d", "h", "s" };
+    
+    if (aCard.m_IsFaceUp)
+    {
+        os << RANKS[aCard.m_Rank] << SUITS[aCard.m_Suit];
+    }
+    else
+    {
+        os << "XX";
+    }
+    
+    return os;
+}
+
 int Card::GetValue() const {
 	int value = 0;
 	if(m_IsFaceUp)
@@ -52,7 +69,7 @@ public:
 		for (iter = m_Cards.begin(); iter != m_Cards.end(); ++iter)
 		{
 			delete *iter;
-			*iter = 0;
+			*iter = nullptr;
 		}
     	m_Cards.clear();
 	}
@@ -70,7 +87,7 @@ public:
 		bool containsAce = false;
 		for (iter = m_Cards.begin(); iter != m_Cards.end(); ++iter)
 		{
-			if ((*iter)->GetValue() == 1)//Card::ACE)
+			if ((*iter)->GetValue() == Card::ACE)
 			{
 				containsAce = true;
 			}
@@ -84,17 +101,77 @@ public:
 	virtual ~Hand(){Clear();}
 };
 
-// Task4
+
 class GenericPlayer : public Hand
 {
+friend ostream& operator<<(ostream& os, const GenericPlayer& aGenericPlayer); // Task5
 protected:
-	string name;
-private:
-	GenericPlayer(string n): name(n) {};
-	virtual bool IsHitting() = 0;
-	bool IsBoosted() const {return (GetTotal() > 21) ? true : false; }
-	void Bust() const {cout << "Уважаемый " << name << ", у вас перебор!" << endl;}
+	string m_Name;
+public:
+	GenericPlayer(const string& name = ""): m_Name(name){};
+	virtual bool IsHitting() const = 0;
+	bool IsBoosted() const {return (GetTotal() > 21);}
+	void Bust() const {cout << m_Name << " busts." << endl;}
 	virtual ~GenericPlayer(){};
+};
+
+// Task5
+ostream& operator<<(ostream& os, const GenericPlayer& aGenericPlayer)
+{
+    os << aGenericPlayer.m_Name << ":\t";
+    vector<Card*>::const_iterator pCard;
+    if (!aGenericPlayer.m_Cards.empty())
+    {
+        for (pCard = aGenericPlayer.m_Cards.begin();pCard != aGenericPlayer.m_Cards.end();++pCard)
+        {
+            os << *(*pCard) << "\t";
+        }
+        if (aGenericPlayer.GetTotal() != 0)
+        {
+            cout << "(" << aGenericPlayer.GetTotal() << ")";
+        }
+    }
+    else
+    {
+        os << "<empty>";
+    }
+    return os;
+}
+
+// Task3
+class Player : public GenericPlayer
+{
+public:
+	Player(const string& name = "");
+	virtual ~Player();
+	virtual bool IsHitting() const
+	{
+		cout << m_Name << ", do you want a hit? (Y/N): ";
+		char response;
+		cin >> response;
+		return (response == 'y' || response == 'Y');
+	};
+	void Win() const {cout << m_Name << " wins.\n";};
+	void Lose() const {cout << m_Name << " loses.\n";};
+	void Push() const {cout << m_Name << " pushes.\n";};
+};
+// Task4
+class House : public GenericPlayer
+{
+	House(const string& name = "House");
+    virtual ~House();
+    virtual bool IsHitting() const {return (GetTotal() <= 16);};
+    void FlipFirstCard()
+	{
+		if (!(m_Cards.empty()))
+		{
+			m_Cards[0]->Flip();
+		}
+		else
+		{
+			cout << "No card to flip!\n";
+		}
+	};
 };
 
 int main(int argc,char** args){
@@ -129,12 +206,6 @@ int main(int argc,char** args){
     }
   */  
 
-    Card *pCard1 = new Card{THREE,DIAMONDS,true};
-	Card *pCard2 = new Card{ACE,DIAMONDS,true};
-	Hand hand;
-	hand.Add(pCard1);
-	hand.Add(pCard2);
-	cout << hand.GetTotal() << endl;
 
     return 0;
 }
